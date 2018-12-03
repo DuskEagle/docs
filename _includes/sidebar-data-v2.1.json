@@ -1596,6 +1596,12 @@
             "urls": [
               "/${VERSION}/cost-based-optimizer.html"
             ]
+          },
+          {
+            "title": "Range Merges",
+            "urls": [
+              "/${VERSION}/range-merges.html"
+            ]
           }
         ]
       },
