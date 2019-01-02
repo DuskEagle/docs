@@ -64,7 +64,7 @@ Ranges only attempt to merge with their right-hand neighbor. Ranges do not curre
 
 Queries in CockroachDB must contact a replica of each range involved in the query. This creates the following issues for clusters with many small ranges:
 
-- Queries incur a fixed overhead for each range it must coordinate with to guarantee transactional consistency.
+- Queries incur a fixed overhead in terms of processing time for each range they must coordinate with.
 - Having many small ranges can increase the number of machines your query must coordinate with. This exposes your query to a greater likelihood of running into issues like network latency or overloaded nodes.
 
 By merging small ranges, CockroachDB can greatly reduce the number of ranges involved in queries and reduce their latency.
