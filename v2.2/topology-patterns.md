@@ -4,25 +4,24 @@ summary: An illustration of common topology patterns.
 toc: true
 ---
 
-This is doc covers common cluster topology patterns with setup examples and performance considerations.
+This is page covers common cluster topology patterns with setup examples and performance considerations.
 
 ## Considerations
 
 When selecting a pattern for your cluster, the following must be taken into consideration:
 
-- Understand the function of a CockroachDB [leaseholder](architecture/replication-layer.html#leases).
-- Understand the impacts of the [leaseholder](architecture/life-of-a-distributed-transaction.html#leaseholder-node) on read and write activities.
+- The function of a CockroachDB [leaseholder](architecture/replication-layer.html#leases).
+- The impacts of the [leaseholder](architecture/life-of-a-distributed-transaction.html#leaseholder-node) on read and write activities.
 - The leaseholders are local to reader and writers within the datacenter.
 - The leaseholder migration among the datacenters is minimized by using the [partitioning feature](partitioning.html).
-- The follow-the-workload tunable setting is set properly for the workload.
 - Whether the application is designed to use the [partitioning feature](partitioning.html) or not.
+- The `--locality` flag is set properly on each node to enable [follow-the-workload](demo-follow-the-workload.html).
 
-Before you select a candidate pattern for your cluster, use the following broad patterns as a starting point for discussion and discuss trades-off. The below describes some of the characteristics of existing catalog of patterns.
+Before you select a candidate pattern for your cluster, use the following broad patterns as a starting point and consider trades-off.
 
 {{site.data.alerts.callout_info}}
-This doc does not factor in hardware differences.
+This page does not factor in hardware differences.
 {{site.data.alerts.end}}
-
 
 ## Single (local) datacenter clusters
 
@@ -34,8 +33,8 @@ In the diagrams below:
 
 - `App` is an application that accesses CockroachDB
 - `HA-Proxy` is a software based load balancer
-- 1, 2, and 3 each represents a CockroachDB node
-- The nodes are all running in a single datacenter.
+- `1`, `2`, and `3` each represents a CockroachDB node
+- The nodes are all running in a single datacenter
 
 Normal operating mode:
 
@@ -49,7 +48,7 @@ Normal operating mode:
  \___________/
 ~~~
 
-If Node 1 goes down, the database and app are still fully operational.
+If Node 1 goes down, the database and app are still fully operational:
 
 ~~~
       App
@@ -61,7 +60,7 @@ x------2------3
  \___________/
 ~~~
 
-If node 2 is down, the database and app are still fully operational.
+If Node 2 is down, the database and app are still fully operational:
 
 ~~~
       App
@@ -73,7 +72,7 @@ If node 2 is down, the database and app are still fully operational.
  \___________/
 ~~~
 
-If node 3 is down, the database and app are still fully operational.
+If Node 3 is down, the database and app are still fully operational:
 
 ~~~
       App
@@ -87,9 +86,9 @@ If node 3 is down, the database and app are still fully operational.
 
 ### More resilient structure
 
-Three or more nodes are recommended to provide high availability, share the load, and spread the capacity. Dynamically scaling out the nodes from 3 to 4, 4 to 5, or any other intervals is supported, and there are no constraints on the server increments.
+Three or more nodes are recommended to provide high availability, share the load, and spread the capacity. Dynamically scaling out the nodes from 3 to 4, 4 to 5, or any other intervals is supported. There are no constraints on the server increments.
 
-The diagram below depicts each node as a letter (A, B, C, D, E):
+The diagram below depicts each node as a letter (i.e., `A`, `B`, `C`, `D`, `E`):
 
 ~~~
 A------C         A-----C           A-----C
@@ -101,13 +100,11 @@ A------C         A-----C           A-----C
 
 ## Multi-region clusters
 
-The sample patterns in this section indicate a broad placement of datacenters with “West”, “East” and “Central”. The latency numbers (e.g., 60ms) represent network round-trip from one datacenter to another.
+The sample patterns in this section indicate a broad placement of datacenters as `West`, `East` and `Central`. The latency numbers (e.g., `60ms`) represent network round-trip from one datacenter to another.
 
 ### Basic structure for minimum resilience
 
-Each region defines an availability zone. Three or more regions are recommended. Similar to the [local](#single-local-datacenter) topology, more regions can be added dynamically. It is recommended to have homogenous configuration among the regions for simplified operations. For sophisticated workloads, each region could have different node count and node specification. This heterogeneous configuration could better handle regional specific concurrency and load characteristics. The network latency among the regions is expected to be linear to the distance among the nodes.
-
-The diagram below depicts asymmetrical setup where the Central is closer to the West than the East. This configuration will provide better write latency to the write workloads in the West and Central.
+The diagram below depicts an asymmetrical setup where `Central` is closer to the `West` than the `East`. This configuration will provide better write latency to the write workloads in the `West` and `Central`.
 
 ~~~
 A---C         A---C
@@ -125,21 +122,29 @@ A---C         A---C
           B
 ~~~
 
+#### CockroachDB configuration
+
+- In this pattern, each region defines an availability zone.
+- Three or more regions are recommended.
+- Similar to the [local](#single-local-datacenter-clusters) topology, more regions can be added dynamically.
+- A homogenous configuration among the regions for simplified operations is recommended.
+- For sophisticated workloads, each region can have different node count and node specification. This heterogeneous configuration could better handle regional specific concurrency and load characteristics.
+
+#### Availability expectations
+
+- Each region defines an availability zone, and three or more regions are recommended.
+
+#### Performance expectations
+
+- The network latency among the regions is expected to be linear to the distance among the nodes.
+
 <!-- ### More resilient / different structure
 
 _Add description_ -->
 
 ### Locality-aware load balancing
 
-When locality is enabled, `haproxy` should be setup to load balance on the database nodes within the same locality as the app servers first. If all of the nodes this preferred locality is down, then try databases in other localities.
-
-For a regional topology depicted in the below diagram:
-
-- the West app servers should connect to the West CockroachDB servers.
-- the Central app servers should connect to the Central CockroachDB servers.
-- the East app servers should connect to the East CockroachDB servers.
-
-Modern n-tier architecture is simplified as App and DB layers in the below diagram. A client connects to geographically close app server via GSLB. The app servers connect to one of the CockroachDB nodes within their geography via local balancer. A software-based load balancer, HAProxy, located on the app server, the configuration is provided by CockroachDB. A Network-based load balancer can also be used.
+Modern n-tier architecture is simplified as `App` and `LB` layers in the below diagram:
 
 ~~~
          Clients
@@ -160,9 +165,33 @@ West    Central    East
       -------------
 ~~~
 
+#### CockroachDB configuration
+
+- A client connects to geographically close app server via `GSLB`.
+- The app servers connect to one of the CockroachDB nodes within their geography via local balancer (`LB`).
+- The configuration for the software-based load balancer (`HAProxy`), located on the app server, is provided by CockroachDB. A network-based load balancer can also be used.
+
+#### Availability expectations
+
+- Can survive a single datacenter failure
+
+#### Performance expectations
+
+<!-- Add -->
+
+#### Application expectations
+
+When locality is enabled, `haproxy` should be setup to load balance on the database nodes within the same locality as the app servers first:
+
+- The `West` app servers should connect to the West CockroachDB servers.
+- The `Central` app servers should connect to the Central CockroachDB servers.
+- The `East` app servers should connect to the East CockroachDB servers.
+
+If all of the nodes for a preferred locality are down, then the app will try databases in other localities.
+
 ### High-Performance
 
-Some applications have high-performance requirements. NJ and NY in the below diagram depict two separate datacenters that are connected by a high bandwidth low latency network. In this topology, NJ and NY have the performance characteristics of the local topology, but the benefit of Zero RPO and near Zero RTO disaster recovery SLA. CA and NV have been set up with a network capability. The central region serves as the quorum.
+Some applications have high-performance requirements. In the diagram below, `NJ` and `NY` depict two separate datacenters that are connected by a high bandwidth low-latency network:
 
 ~~~
    NJ ---1ms--- NY
@@ -176,13 +205,19 @@ Some applications have high-performance requirements. NJ and NY in the below dia
      20ms  20ms  
      /       \  
   CA ---1ms--- NV
-  ~~~
+~~~
+
+In this topology:
+
+- `NJ` and `NY` have the performance characteristics of the [local topology](#single-local-datacenter-clusters), but the benefit of Zero RPO and near Zero RTO disaster recovery SLA.
+- `CA` and `NV` have been set up with a network capability
+- The `Central` region serves as the quorum.
 
 ## Global clusters
 
 ### Basic structure for minimum resilience
 
-The global topology connects the multiple regional topologies together to form a single database that is globally distributed. Transactions are globally consistent.
+The global pattern connects [multiple regional clusters](#multi-region-clusters) together to form a single database that is globally distributed. Transactions are globally consistent.
 
 ~~~
     West-----East            West-------East
@@ -204,13 +239,14 @@ The global topology connects the multiple regional topologies together to form a
                     Central
 ~~~
 
+
 <!-- ### More resilient / different structure
 
 _Add description_ -->
 
 ## Partitioned clusters
 
-The sample patterns in this section assume the usage of the geo-partitioning feature, with “West”, “East” and “Central” indicating broad placement of datacenters. The latency numbers (e.g., 60ms) represent network round-trip from one datacenter to another.
+The sample patterns in this section assume the usage of the [geo-partitioning feature](partitioning.html), with `West`, `East` and `Central` indicating a broad placement of datacenters. The latency numbers (e.g., `60ms`) represent network round-trip from one datacenter to another.
 
 
 Topology                                              | West                         | Central                | East
@@ -239,26 +275,28 @@ West ---60ms--- East
 #### Replicas and leaseholders
 
 - Tables are partitioned at row-level by locality.
-- Rows with the West partition have their Leaseholder in the West datacenter, rows with the Central partition have their Leaseholder in the Central datacenter, and rows with the East partition have their Leaseholder in the East datacenter.
+- Rows with the `West` partition have their leaseholder in the `West` datacenter.
+- Rows with the `Central` partition have their leaseholder in the `Central` datacenter.
+- Rows with the `East` partition have their leaseholder in the `East` datacenter.
 - Replicas are evenly distributed among the three datacenters.
 
-Availability expectations
+#### Availability expectations
 
 - The cluster can survive a single datacenter failure.
 
 #### Performance expectations
 
 - Reads respond in a few milliseconds.
-- Writes respond in 60 milliseconds.
-- Symmetrical 60 milliseconds between datacenters.
+- Writes respond in 60ms.
+- Symmetrical latency between datacenters.
 
 #### Application expectations
 
-- West App servers connect to the West CockroachDB nodes.
-- Central App servers connect to the Central CockroachDB nodes.
-- East App servers connect to the East CockroachDB nodes.
+- West `App` servers connect to the `West` CockroachDB nodes.
+- Central `App` servers connect to the `Central` CockroachDB nodes.
+- East `App` servers connect to the `East` CockroachDB nodes.
 
-CockroachDB configuration
+#### CockroachDB configuration
 
 - Abbreviated startup flag for each datacenter:
 
@@ -284,23 +322,24 @@ West ---60ms--- East1
 
 #### Replicas and leaseholders
 
-- rows with the West partition will have the leaseholder in the West DC, the East partition in the East DC1
-- the 3 replicas will be evenly distributed among the three datacenters
+- Rows with the `West` partition will have the leaseholder in the `West` datacenter.
+- Rows with the `East` partition will have the leaseholder in the `East1` datacenter.
+- The 3 replicas will be evenly distributed among the three datacenters.
 
 #### Availability expectations
 
-- Can survive a single datacenter failure
+- The cluster can survive a single datacenter failure.
 
 #### Performance expectations
 
-- The reader can expect to have a couple of ms response time.
-- The East writers can expect to have 5ms response time.
-- The West writers can expect to have 60ms response time.
+- The reader can expect to have a couple of milliseconds response time.
+- The `East` writers can expect to have a 5ms response time.
+- The `West` writers can expect to have a 60ms response time.
 
 #### Application expectations
 
-- West App servers connect to the West CockroachDB nodes
-- East App servers connect to the East1 CockroachDB nodes
+- West `App` servers connect to the `West` CockroachDB nodes
+- East `App` servers connect to the `East1` CockroachDB nodes
 
 #### CockroachDB configuration
 
@@ -328,23 +367,24 @@ West2----60ms----East2
 
 #### Replicas and leaseholders
 
-- Rows with the West partition will have the leaseholder in the West DC1, the East partition in the East DC1
-- West partitions will have 1 replica each in West1 and West2, then 1 replica in East1 or East2
-- East partitions will have 1 replica each in East1 and East2, then 1 replica in West1 or West2
+- Rows with the `West` partition will have the leaseholder in the `West1` datacenter.
+- Rows with the `East` partition will have the leaseholder in the `East1` datacenter.
+- West partitions will have 1 replica each in `West1` and `West2`, then 1 replica in `East1` or `East2`.
+- East partitions will have 1 replica each in `East1` and `East2`, then 1 replica in `West1` or `West2`.
 
 #### Availability expectations
 
-- Can survive a single datacenter failure
+- The cluster can survive a single datacenter failure.
 
 #### Performance expectations
 
-- The reader can expect to have a couple of ms response time.
-- The writers can expect to have 5ms response time.
+- The reader can expect to have a couple of milliseconds response time.
+- The writers can expect to have a 5ms response time.
 
 #### Application expectations
 
-- West App servers connect to the West CockroachDB nodes
-- East App servers connect to the East CockroachDB nodes
+- West `App` servers connect to the `West` CockroachDB nodes.
+- East `App` servers connect to the `East` CockroachDB nodes.
 
 #### CockroachDB configuration
 
