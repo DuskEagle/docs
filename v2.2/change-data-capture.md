@@ -108,7 +108,7 @@ The changefeed emits duplicate records 1, 2, and 3 before outputting the records
 
 ## Enable rangefeeds to reduce latency
 
-<span class="version-tag">New in v2.2:</span> Previously created changefeeds collect changes by periodically sending a request for any recent changes. Newly created changefeeds now behave differently: they connect a long-lived request (i.e., a rangefeed), which pushes changes as they happen. This reduces the latency of row changes as well as transaction restarts on tables being watched by a changefeed for some workloads.
+<span class="version-tag">New in v2.2:</span> Previously created changefeeds collect changes by periodically sending a request for any recent changes. Newly created changefeeds now behave differently: they connect a long-lived request (i.e., a rangefeed), which pushes changes as they happen. This reduces the latency of row changes as well as reduces transaction restarts on tables being watched by a changefeed for some workloads.
 
 To enable rangefeeds, set the `kv.rangefeed.enabled` [cluster setting](cluster-settings.html) to `true`. Any created changefeed will error until this setting is enabled. Note that enabling rangefeeds currently has a small performance cost, whether or not the rangefeed is being using in a changefeed.
 
